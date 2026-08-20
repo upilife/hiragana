@@ -1,0 +1,636 @@
+<meta charset="utf-8">
+<title>ひらがな</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#E7E9F3">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ひらがな">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root{
+    --desk:#E7E9F3;
+    --desk-deep:#D5D9EC;
+    --paper:#FFFDF8;
+    --ink:#33384D;
+    --ink-soft:#7A7F96;
+    --guide:#D6DAEB;
+    --ghost:#E0DBCF;
+    --crayon:#E24B7A;
+    --crayon-deep:#C22F5E;
+    --go:#2BA39B;
+    --go-deep:#1F827B;
+    --star:#F2B33D;
+    --font:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","M PLUS Rounded 1c","Yu Gothic Medium","游ゴシック体",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--font);
+    background:var(--desk);
+    color:var(--ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{max-width:430px;margin:0 auto;padding:18px 16px 32px;min-height:100vh;display:flex;flex-direction:column}
+  .screen{display:none;flex:1;flex-direction:column}
+  .screen.on{display:flex}
+
+  /* ---------- screen 1 ---------- */
+  .masthead{margin:6px 2px 20px}
+  .masthead h1{
+    margin:0;font-size:30px;font-weight:800;letter-spacing:.22em;line-height:1;
+  }
+  .masthead p{margin:9px 0 0;font-size:12.5px;color:var(--ink-soft);letter-spacing:.06em}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+  .tile{
+    position:relative;appearance:none;border:0;cursor:pointer;
+    background:var(--paper);
+    border-radius:20px;
+    padding:0;aspect-ratio:1/1.13;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    box-shadow:0 3px 0 var(--desk-deep), 0 7px 14px rgba(51,56,77,.07);
+    transition:transform .12s ease, box-shadow .12s ease;
+    font-family:var(--font);
+  }
+  .tile:active{transform:translateY(3px);box-shadow:0 0 0 var(--desk-deep),0 3px 8px rgba(51,56,77,.07)}
+  .tile:focus-visible{outline:3px solid var(--go);outline-offset:3px}
+  .tile .ch{font-size:44px;font-weight:600;line-height:1;color:var(--ink);margin-top:6px}
+  .tally{
+    display:flex;align-items:center;gap:3px;height:20px;
+    font-size:13px;font-weight:800;color:var(--star);letter-spacing:.02em;
+  }
+  .tally.zero{opacity:.28;color:var(--ink-soft)}
+  .tally svg{width:13px;height:13px;display:block}
+
+  /* ---------- screen 2 ---------- */
+  .bar{display:flex;align-items:center;gap:12px;margin:0 2px 14px;min-height:44px}
+  .iconbtn{
+    appearance:none;border:0;cursor:pointer;background:var(--paper);
+    width:44px;height:44px;border-radius:15px;display:grid;place-items:center;
+    box-shadow:0 3px 0 var(--desk-deep);color:var(--ink);flex:none;
+  }
+  .iconbtn:active{transform:translateY(3px);box-shadow:none}
+  .iconbtn:focus-visible{outline:3px solid var(--go);outline-offset:3px}
+  .iconbtn svg{width:21px;height:21px}
+  .bar .now{font-size:26px;font-weight:700;line-height:1}
+  .bar .steps{margin-left:auto;display:flex;gap:6px;align-items:center}
+  .pip{width:9px;height:9px;border-radius:50%;background:var(--desk-deep)}
+  .pip.done{background:var(--crayon)}
+  .pip.now{background:var(--crayon);box-shadow:0 0 0 4px rgba(226,75,122,.2)}
+
+  .sheet{
+    background:var(--paper);border-radius:26px;padding:10px;
+    box-shadow:0 4px 0 var(--desk-deep),0 10px 22px rgba(51,56,77,.09);
+    position:relative;
+  }
+  svg.pad{display:block;width:100%;height:auto;touch-action:none}
+
+  .ghost-s{fill:none;stroke:var(--ghost);stroke-width:11;stroke-linecap:round;stroke-linejoin:round}
+  .done-s{fill:none;stroke:var(--crayon);stroke-width:11;stroke-linecap:round;stroke-linejoin:round}
+  .live-s{fill:none;stroke:var(--crayon);stroke-width:11;stroke-linecap:round;stroke-linejoin:round}
+  .frame{fill:none;stroke:var(--guide);stroke-width:1.4}
+  .cross{stroke:var(--guide);stroke-width:1.2;stroke-dasharray:3 4.5}
+
+  #ring{fill:none;stroke:var(--crayon);stroke-width:2;opacity:.55;transform-origin:center}
+  #dot{fill:var(--paper);stroke:var(--crayon);stroke-width:2.6}
+  #dotnum{fill:var(--crayon);font-size:8px;font-weight:800;text-anchor:middle;font-family:var(--font)}
+  .marker.flash #dot{fill:var(--crayon)}
+  .marker.flash #dotnum{fill:var(--paper)}
+  .marker.flash{animation:shake .45s ease}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-2px,0)}45%{transform:translate(2.5px,0)}70%{transform:translate(-1.5px,0)}}
+  @keyframes breathe{0%,100%{r:9;opacity:.5}50%{r:13;opacity:.12}}
+  #ring{animation:breathe 1.7s ease-in-out infinite}
+
+  .hint{margin:12px 4px 0;text-align:center;font-size:13px;color:var(--ink-soft);min-height:19px;letter-spacing:.04em}
+  .hint.warn{color:var(--crayon-deep);font-weight:700}
+
+  .controls{margin-top:16px;display:flex;gap:12px;align-items:center;justify-content:center}
+  .listen{
+    appearance:none;border:0;cursor:pointer;font-family:var(--font);
+    background:var(--go);color:#fff;border-radius:24px;
+    padding:0 26px;height:60px;display:flex;align-items:center;gap:10px;
+    font-size:19px;font-weight:800;letter-spacing:.08em;
+    box-shadow:0 4px 0 var(--go-deep);
+  }
+  .listen:active{transform:translateY(4px);box-shadow:none}
+  .listen:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+  .listen svg{width:23px;height:23px}
+  .again{
+    appearance:none;border:0;cursor:pointer;font-family:var(--font);
+    background:var(--paper);color:var(--ink);border-radius:24px;
+    width:60px;height:60px;display:grid;place-items:center;
+    box-shadow:0 4px 0 var(--desk-deep);
+  }
+  .again:active{transform:translateY(4px);box-shadow:none}
+  .again:focus-visible{outline:3px solid var(--go);outline-offset:3px}
+  .again svg{width:24px;height:24px}
+
+  /* ---------- celebration ---------- */
+  .yay{
+    position:absolute;inset:10px;border-radius:20px;
+    background:rgba(255,253,248,.93);backdrop-filter:blur(2px);
+    display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  }
+  .yay.on{display:flex;animation:pop .32s cubic-bezier(.2,1.5,.5,1)}
+  @keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+  .yay .big{font-size:84px;font-weight:600;color:var(--crayon);line-height:1}
+  .yay .stars{display:flex;gap:5px}
+  .yay .stars svg{width:26px;height:26px;color:var(--star)}
+  .yay .stars svg:nth-child(1){animation:rise .4s .05s backwards}
+  .yay .stars svg:nth-child(2){animation:rise .4s .15s backwards}
+  .yay .stars svg:nth-child(3){animation:rise .4s .25s backwards}
+  @keyframes rise{from{opacity:0;transform:translateY(14px) rotate(-25deg)}to{opacity:1;transform:none}}
+  .yay .count{
+    font-size:15px;font-weight:800;color:var(--star);letter-spacing:.06em;
+    display:flex;align-items:center;gap:5px;
+  }
+  .yay .count svg{width:15px;height:15px}
+
+  .snote{
+    display:none;margin:14px 6px 0;padding:11px 13px;border-radius:13px;
+    background:rgba(255,253,248,.75);border:1px solid var(--desk-deep);
+    font-size:11.5px;line-height:1.65;color:var(--ink-soft);letter-spacing:.02em;
+  }
+  .snote.on{display:block}
+  .snote b{color:var(--ink);font-weight:800}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+
+<div class="app">
+
+  <!-- ========== 1. もじをえらぶ ========== -->
+  <section id="pick" class="screen on">
+    <div class="masthead">
+      <h1>ひらがな</h1>
+      <p>すきな もじを えらんでね</p>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <!-- ========== 2. れんしゅう ========== -->
+  <section id="practice" class="screen">
+    <div class="bar">
+      <button class="iconbtn" id="back" aria-label="もどる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="now" id="nowchar">し</div>
+      <div class="steps" id="pips"></div>
+    </div>
+
+    <div class="sheet">
+      <svg class="pad" id="pad" viewBox="0 0 100 100" aria-label="なぞりばん">
+        <rect class="frame" x="3" y="3" width="94" height="94" rx="10"/>
+        <line class="cross" x1="50" y1="8" x2="50" y2="92"/>
+        <line class="cross" x1="8" y1="50" x2="92" y2="50"/>
+        <g id="ghosts"></g>
+        <g id="dones"></g>
+        <path id="live" class="live-s"/>
+        <g class="marker" id="marker">
+          <circle id="ring" cx="0" cy="0" r="9"/>
+          <circle id="dot" cx="0" cy="0" r="6.4"/>
+          <text id="dotnum" x="0" y="2.9">1</text>
+        </g>
+      </svg>
+
+      <div class="yay" id="yay">
+        <div class="stars">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.7 1.2 6.7L12 17.3 6.1 20.5l1.2-6.7L2.5 9.1l6.6-.9z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.7 1.2 6.7L12 17.3 6.1 20.5l1.2-6.7L2.5 9.1l6.6-.9z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.7 1.2 6.7L12 17.3 6.1 20.5l1.2-6.7L2.5 9.1l6.6-.9z"/></svg>
+        </div>
+        <div class="big" id="yaychar">し</div>
+        <div class="count" id="yaycount"></div>
+      </div>
+    </div>
+
+    <div class="hint" id="hint">ゆびで なぞってね</div>
+
+    <div class="controls">
+      <button class="listen" id="listen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17.5 8.5a5 5 0 010 7"/></svg>
+        きく
+      </button>
+      <button class="again" id="again" aria-label="もういっかい">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+    </div>
+
+    <div class="snote" id="snote"></div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================
+   もじデータ（書き順つき）
+   ========================================================= */
+const CHARS = [
+  { c:"し", strokes:["M 40,16 C 40,44 39,66 50,76 C 61,86 74,78 80,64"] },
+  { c:"つ", strokes:["M 24,34 C 40,24 66,22 74,36 C 82,52 60,70 30,76"] },
+  { c:"く", strokes:["M 62,18 L 32,50 L 62,82"] },
+  { c:"へ", strokes:["M 20,60 L 46,38 L 80,66"] },
+  { c:"こ", strokes:["M 26,30 C 42,26 58,26 72,30",
+                     "M 24,64 C 38,74 60,76 76,66"] },
+  { c:"い", strokes:["M 30,26 C 25,44 25,62 33,72 C 39,79 46,76 51,68",
+                     "M 76,30 C 76,44 74,56 70,66"] },
+  { c:"う", strokes:["M 40,20 C 48,18 56,18 63,21",
+                     "M 30,38 C 46,32 68,34 71,50 C 74,66 58,76 38,80"] },
+  { c:"り", strokes:["M 36,22 C 33,38 34,52 43,60",
+                     "M 72,22 C 74,44 72,66 60,78 C 51,87 42,84 38,77"] },
+];
+
+const STEP = 1.4;   // サンプリング間隔
+const TOL  = 15;    // なぞりの許容ズレ（ゆるめ）
+const TOL_START = 17;
+const LOOKAHEAD = 26;
+
+/* =========================================================
+   ほぞん（回数だけ）
+   ========================================================= */
+const KEY = "hiragana-counts";
+let counts = {};
+
+async function loadCounts(){
+  // Claude の中で開いたとき
+  try{
+    if(window.storage){
+      const r = await window.storage.get(KEY);
+      if(r && r.value){ counts = JSON.parse(r.value); return; }
+    }
+  }catch(e){}
+  // ふつうのブラウザで開いたとき
+  try{
+    const raw = window.localStorage.getItem(KEY);
+    if(raw) counts = JSON.parse(raw);
+  }catch(e){ counts = {}; }
+}
+
+async function saveCounts(){
+  const json = JSON.stringify(counts);
+  try{ if(window.storage) await window.storage.set(KEY, json); }catch(e){}
+  try{ window.localStorage.setItem(KEY, json); }catch(e){}
+}
+
+/* =========================================================
+   がめん 1
+   ========================================================= */
+const gridEl = document.getElementById("grid");
+const STAR = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.9-4.8 4.7 1.2 6.7L12 17.3 6.1 20.5l1.2-6.7L2.5 9.1l6.6-.9z"/></svg>';
+
+function renderGrid(){
+  gridEl.innerHTML = "";
+  CHARS.forEach((item, i)=>{
+    const n = counts[item.c] || 0;
+    const b = document.createElement("button");
+    b.className = "tile";
+    b.setAttribute("aria-label", item.c + " " + n + "かい");
+    b.innerHTML =
+      '<span class="ch">'+item.c+'</span>' +
+      '<span class="tally'+(n?'':' zero')+'">'+STAR+(n?n:'0')+'</span>';
+    b.addEventListener("click", ()=> openPractice(i));
+    gridEl.appendChild(b);
+  });
+}
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on", s.id===id));
+}
+
+/* =========================================================
+   がめん 2 ／ なぞり
+   ========================================================= */
+const pad     = document.getElementById("pad");
+const ghostsG = document.getElementById("ghosts");
+const donesG  = document.getElementById("dones");
+const liveEl  = document.getElementById("live");
+const marker  = document.getElementById("marker");
+const dot     = document.getElementById("dot");
+const ring    = document.getElementById("ring");
+const dotnum  = document.getElementById("dotnum");
+const hintEl  = document.getElementById("hint");
+const pipsEl  = document.getElementById("pips");
+const nowEl   = document.getElementById("nowchar");
+const yay     = document.getElementById("yay");
+const yayChar = document.getElementById("yaychar");
+const yayCount= document.getElementById("yaycount");
+
+let cur = null;        // いまの もじ
+let strokeIdx = 0;
+let progress  = 0;
+let tracing   = false;
+let samples   = [];    // いまの画の点れつ
+let totalLen  = 0;
+let allSamples= [];    // 全画ぶんの点れつ
+let finished  = false;
+
+function samplePath(d){
+  const p = document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d", d);
+  ghostsG.appendChild(p);          // 一時的に DOM に入れて計測
+  const len = p.getTotalLength();
+  const pts = [];
+  for(let l=0; l<=len; l+=STEP){
+    const q = p.getPointAtLength(l);
+    pts.push({x:q.x, y:q.y});
+  }
+  const q = p.getPointAtLength(len);
+  pts.push({x:q.x, y:q.y});
+  ghostsG.removeChild(p);
+  return {pts, len};
+}
+
+function openPractice(index){
+  cur = CHARS[index];
+  finished = false;
+  strokeIdx = 0;
+
+  nowEl.textContent = cur.c;
+  yayChar.textContent = cur.c;
+  yay.classList.remove("on");
+
+  // ゴースト（うすい おてほん）
+  ghostsG.innerHTML = "";
+  donesG.innerHTML  = "";
+  allSamples = [];
+  cur.strokes.forEach(d=>{
+    const g = document.createElementNS("http://www.w3.org/2000/svg","path");
+    g.setAttribute("d", d);
+    g.setAttribute("class","ghost-s");
+    ghostsG.appendChild(g);
+    allSamples.push(samplePath(d));
+  });
+
+  // すすみ ぐあいの ドット
+  pipsEl.innerHTML = "";
+  cur.strokes.forEach(()=>{
+    const s = document.createElement("span");
+    s.className = "pip";
+    pipsEl.appendChild(s);
+  });
+
+  snote.classList.remove("on");
+  show("practice");
+  setStroke(0);
+  speak(cur.c);
+}
+
+function setStroke(i){
+  strokeIdx = i;
+  progress = 0;
+  tracing = false;
+  const s = allSamples[i];
+  samples = s.pts;
+  totalLen = s.len;
+
+  liveEl.setAttribute("d", cur.strokes[i]);
+  liveEl.style.strokeDasharray  = totalLen + " " + totalLen;
+  liveEl.style.strokeDashoffset = totalLen;
+
+  moveMarker(samples[0]);
+  dotnum.textContent = (i+1);
+  marker.style.display = "";
+  updatePips();
+  setHint(i===0 ? "ゆびで なぞってね" : "つぎの せんへ", false);
+}
+
+function moveMarker(p){
+  dot.setAttribute("cx",p.x); dot.setAttribute("cy",p.y);
+  ring.setAttribute("cx",p.x); ring.setAttribute("cy",p.y);
+  dotnum.setAttribute("x",p.x); dotnum.setAttribute("y",p.y+2.9);
+}
+
+function updatePips(){
+  [...pipsEl.children].forEach((el,i)=>{
+    el.className = "pip" + (i<strokeIdx ? " done" : i===strokeIdx ? " now" : "");
+  });
+}
+
+function setHint(text, warn){
+  hintEl.textContent = text;
+  hintEl.classList.toggle("warn", !!warn);
+}
+
+function flashMarker(){
+  marker.classList.remove("flash");
+  void marker.offsetWidth;
+  marker.classList.add("flash");
+  setTimeout(()=>marker.classList.remove("flash"), 500);
+}
+
+function toSvg(evt){
+  const m = pad.getScreenCTM().inverse();
+  const pt = pad.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  return pt.matrixTransform(m);
+}
+const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+
+function reveal(){
+  const len = Math.min(progress*STEP, totalLen);
+  liveEl.style.strokeDashoffset = (totalLen - len);
+}
+
+pad.addEventListener("pointerdown", e=>{
+  if(!cur || finished) return;
+  const p = toSvg(e);
+
+  // はじめから、または とちゅうから つづける
+  if(dist(p, samples[0]) <= TOL_START){
+    tracing = true; progress = 0; reveal();
+  }else if(progress>0 && dist(p, samples[progress]) <= TOL_START){
+    tracing = true;
+  }else{
+    // ちがう画の はじまりを さわった？
+    let wrong = false;
+    allSamples.forEach((s,i)=>{
+      if(i!==strokeIdx && dist(p, s.pts[0]) <= TOL_START) wrong = true;
+    });
+    flashMarker();
+    setHint(wrong ? "つぎは ここから！" : "まるい ところから はじめてね", wrong);
+    return;
+  }
+  pad.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+
+pad.addEventListener("pointermove", e=>{
+  if(!tracing) return;
+  const p = toSvg(e);
+  let best = progress;
+  const end = Math.min(progress + LOOKAHEAD, samples.length-1);
+  for(let i=progress+1; i<=end; i++){
+    if(dist(p, samples[i]) <= TOL) best = i;
+  }
+  if(best > progress){
+    progress = best;
+    moveMarker(samples[progress]);
+    reveal();
+    if(hintEl.classList.contains("warn")) setHint("そのまま すすんでね", false);
+    if(progress >= samples.length-2) completeStroke();
+  }
+  e.preventDefault();
+}, {passive:false});
+
+function endPointer(){ tracing = false; }
+pad.addEventListener("pointerup", endPointer);
+pad.addEventListener("pointercancel", endPointer);
+pad.addEventListener("pointerleave", endPointer);
+
+function completeStroke(){
+  tracing = false;
+  progress = samples.length-1;
+  liveEl.style.strokeDashoffset = 0;
+
+  // かきおわった せんを こていする
+  const done = document.createElementNS("http://www.w3.org/2000/svg","path");
+  done.setAttribute("d", cur.strokes[strokeIdx]);
+  done.setAttribute("class","done-s");
+  donesG.appendChild(done);
+  liveEl.style.strokeDashoffset = totalLen;
+
+  if(strokeIdx < cur.strokes.length-1){
+    setStroke(strokeIdx+1);
+    flashMarker();
+  }else{
+    finishChar();
+  }
+}
+
+async function finishChar(){
+  finished = true;
+  marker.style.display = "none";
+  [...pipsEl.children].forEach(el=>el.className="pip done");
+  setHint("できた！", false);
+
+  counts[cur.c] = (counts[cur.c]||0) + 1;
+  yayCount.innerHTML = STAR + counts[cur.c] + "かいめ";
+  yay.classList.add("on");
+  speak(cur.c);
+  await saveCounts();
+}
+
+/* =========================================================
+   おと
+   ========================================================= */
+const snote = document.getElementById("snote");
+let jaVoice = null;
+let heldUtter = null;   // Chrome の GC よけ
+let actx = null;
+
+function pickVoice(){
+  if(!window.speechSynthesis) return null;
+  const vs = window.speechSynthesis.getVoices() || [];
+  return vs.find(v => v.lang && v.lang.replace("_","-").toLowerCase().indexOf("ja") === 0) || null;
+}
+if(window.speechSynthesis){
+  jaVoice = pickVoice();
+  window.speechSynthesis.onvoiceschanged = ()=>{ jaVoice = pickVoice(); };
+}
+
+// よみあげが つかえないときの かわりの おと
+function chime(){
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === "suspended") actx.resume();
+    const t = actx.currentTime;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(784, t);
+    o.frequency.setValueAtTime(1046, t + 0.13);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + 0.42);
+    return true;
+  }catch(e){ return false; }
+}
+
+function note(kind){
+  if(kind === "ok"){ snote.classList.remove("on"); return; }
+  if(kind === "novoice"){
+    snote.innerHTML =
+      '<b>読み上げの声が使えません。</b>かわりに音を鳴らしています。<br>' +
+      'Android の場合、端末に日本語の音声データが入っていないことが多いです。' +
+      '設定 → システム → 言語と入力 → テキスト読み上げの出力 → ' +
+      'Google 音声サービス の歯車 → 音声データのインストール → 日本語、で追加できます。' +
+      'メディア音量とマナーモードも確認してください。';
+  }else{
+    snote.innerHTML =
+      '<b>音が出せませんでした。</b>端末のメディア音量とマナーモードを確認してください。' +
+      'ブラウザによっては音がブロックされることがあるので、その場合は Claude アプリで開いてみてください。';
+  }
+  snote.classList.add("on");
+}
+
+function speak(text){
+  if(!window.speechSynthesis){
+    note(chime() ? "novoice" : "dead");
+    return;
+  }
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    heldUtter = u;
+    u.lang = "ja-JP";
+    u.rate = 0.75;
+    u.pitch = 1.15;
+    u.volume = 1;
+    if(!jaVoice) jaVoice = pickVoice();
+    if(jaVoice) u.voice = jaVoice;
+
+    let started = false;
+    u.onstart = ()=>{ started = true; note("ok"); };
+    u.onerror = ()=>{ if(!started) note(chime() ? "novoice" : "dead"); };
+
+    // Android Chrome は cancel の直後に speak すると鳴らないことがある
+    setTimeout(()=>{ try{ window.speechSynthesis.speak(u); }catch(e){} }, 60);
+    setTimeout(()=>{ if(!started) note(chime() ? "novoice" : "dead"); }, 1100);
+  }catch(e){
+    note(chime() ? "novoice" : "dead");
+  }
+}
+
+/* =========================================================
+   ボタン
+   ========================================================= */
+document.getElementById("listen").addEventListener("click", ()=>{ if(cur) speak(cur.c); });
+
+document.getElementById("again").addEventListener("click", ()=>{
+  if(!cur) return;
+  const i = CHARS.indexOf(cur);
+  openPractice(i);
+});
+
+document.getElementById("back").addEventListener("click", ()=>{
+  try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
+  renderGrid();
+  show("pick");
+});
+
+/* =========================================================
+   スタート
+   ========================================================= */
+(async ()=>{
+  await loadCounts();
+  renderGrid();
+})();
+</script>
+<script>
+/* =========================================================
+   オフライン対応（Service Worker の登録）
+   ========================================================= */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+</script>
