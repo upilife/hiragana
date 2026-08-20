@@ -2,7 +2,7 @@
    Service Worker（オフライン対応）
    アプリを更新したら、下の CACHE の番号を v1 → v2 と上げること
    ========================================================= */
-const CACHE = "hiragana-v5";
+const CACHE = "hiragana-v6";
 const ASSETS = [
   "./",
   "./index.html",

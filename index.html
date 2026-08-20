@@ -296,6 +296,7 @@ const TOL_START = 17;
 const LOOKAHEAD = 26;
 const DRAG  = 0.18; // 線の おもさ。小さいほど もたつく
 const SLACK = 5;    // 手ぶれで ためこめる「貯金」の上限
+const MAXDEV = 20;  // お手本から はなれてええ 最大きょり（はみ出しの限界）
 
 /* =========================================================
    ほぞん（回数だけ）
@@ -439,9 +440,8 @@ function setStroke(i){
   samples = s.pts;
   totalLen = s.len;
 
-  liveEl.setAttribute("d", cur.strokes[i]);
-  liveEl.style.strokeDasharray  = totalLen + " " + totalLen;
-  liveEl.style.strokeDashoffset = totalLen;
+  liveEl.style.strokeDasharray  = "none";
+  liveEl.style.strokeDashoffset = 0;
   resetReveal();
 
   moveMarker(samples[0]);
@@ -483,34 +483,47 @@ function toSvg(evt){
 }
 const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
 
-/* ---- 線を じわっと のばす ----
-   いっきに描画すると 機械が引いた線みたいで「書いた感」が出えへん。
-   目標に むかって すこしずつ 近づけて、えんぴつの おもさを出す。 */
-let shownLen  = 0;     // いま描かれてる長さ
-let targetLen = 0;     // 指が ゆるしてる長さ
-let rafId     = 0;
-let onArrive  = null;  // 追いついたら やること
+/* ---- 指が じっさいに通った あとを 描く ----
+   お手本のパスを めくって見せるやり方やと、どこを さわっても
+   きれいな線しか出えへん。だから「はみ出した」が ぜったい見えへんかった。
+   ほんまに指が通った ところを 点でつないで描く。
+   目標へ じわっと 近づけることで えんぴつの おもさも出る。 */
+let drawPts  = [];     // 描いてきた点れつ
+let drawPt   = null;   // いまの ペン先
+let targetPt = null;   // 指のいち（はみ出しは MAXDEV までに制限）
+let rafId    = 0;
+let onArrive = null;   // 追いついたら やること
 
-function paint(){
-  liveEl.style.strokeDashoffset = (totalLen - shownLen);
-  const i = Math.max(0, Math.min(Math.round(shownLen/STEP), samples.length-1));
-  moveMarker(samples[i]);
+function pathOf(pts){
+  if(!pts.length) return "";
+  let d = "M " + pts[0].x.toFixed(2) + "," + pts[0].y.toFixed(2);
+  for(let i=1;i<pts.length;i++) d += " L " + pts[i].x.toFixed(2) + "," + pts[i].y.toFixed(2);
+  return d;
 }
 
-function reveal(){
-  targetLen = Math.min(progress*STEP, totalLen);
-  if(rafId) return;
+function paint(){
+  liveEl.setAttribute("d", pathOf(drawPts));
+  if(drawPt) moveMarker(drawPt);
+}
+
+function pushPt(p){
+  const last = drawPts[drawPts.length-1];
+  if(!last || dist(last,p) > 0.6) drawPts.push({x:p.x, y:p.y});
+}
+
+function startRaf(){
+  if(rafId || !drawPt || !targetPt) return;
   const tick = ()=>{
-    const d = targetLen - shownLen;
-    if(Math.abs(d) < 0.12){
-      shownLen = targetLen;
-      paint();
+    const dx = targetPt.x - drawPt.x, dy = targetPt.y - drawPt.y;
+    if(Math.hypot(dx,dy) < 0.15){
+      drawPt = {x:targetPt.x, y:targetPt.y};
+      pushPt(drawPt); paint();
       rafId = 0;
       if(onArrive){ const f = onArrive; onArrive = null; f(); }
       return;
     }
-    shownLen += d * DRAG;
-    paint();
+    drawPt = { x: drawPt.x + dx*DRAG, y: drawPt.y + dy*DRAG };
+    pushPt(drawPt); paint();
     rafId = requestAnimationFrame(tick);
   };
   rafId = requestAnimationFrame(tick);
@@ -519,7 +532,8 @@ function reveal(){
 function resetReveal(){
   if(rafId) cancelAnimationFrame(rafId);
   rafId = 0; onArrive = null;
-  shownLen = 0; targetLen = 0;
+  drawPts = []; drawPt = null; targetPt = null;
+  liveEl.setAttribute("d", "");
 }
 
 pad.addEventListener("pointerdown", e=>{
@@ -528,7 +542,12 @@ pad.addEventListener("pointerdown", e=>{
 
   // はじめから、または とちゅうから つづける
   if(dist(p, samples[0]) <= TOL_START){
-    tracing = true; progress = 0; traveled = 0; resetReveal(); reveal();
+    tracing = true; progress = 0; traveled = 0;
+    resetReveal();
+    drawPt   = { x:samples[0].x, y:samples[0].y };
+    targetPt = { x:samples[0].x, y:samples[0].y };
+    drawPts  = [ { x:samples[0].x, y:samples[0].y } ];
+    paint();
   }else if(progress>0 && dist(p, samples[progress]) <= TOL_START){
     tracing = true; traveled = progress * STEP;   // とちゅう再開ぶんは差し引く
   }else{
@@ -556,14 +575,28 @@ pad.addEventListener("pointermove", e=>{
   traveled += lastPt ? dist(p, lastPt) : 0;
   const reach = Math.floor(traveled / STEP);
 
-  let best = progress;
-  const end = Math.min(progress + LOOKAHEAD, reach, samples.length-1);
-  for(let i=progress+1; i<=end; i++){
-    if(dist(p, samples[i]) <= TOL) best = i;
+  let best = progress, nearIdx = progress, nearD = Infinity;
+  const end = Math.min(progress + LOOKAHEAD, samples.length-1);
+  for(let i=progress; i<=end; i++){
+    const dd = dist(p, samples[i]);
+    if(dd < nearD){ nearD = dd; nearIdx = i; }
+    if(i > progress && i <= reach && dd <= TOL) best = i;
   }
+
+  /* ペン先は 指のいちへ。ただし お手本から はなれすぎたら
+     MAXDEV で 引きもどす（画面の外まで 行ってまうから） */
+  const a = samples[nearIdx];
+  if(nearD > MAXDEV){
+    const t = MAXDEV / nearD;
+    targetPt = { x: a.x + (p.x-a.x)*t, y: a.y + (p.y-a.y)*t };
+  }else{
+    targetPt = { x:p.x, y:p.y };
+  }
+  if(!drawPt){ drawPt = { x:a.x, y:a.y }; drawPts = [ {x:a.x, y:a.y} ]; }
+  startRaf();
+
   if(best > progress){
     progress = best;
-    reveal();
     if(hintEl.classList.contains("warn")) setHint("そのまま すすんでね", false);
     if(progress >= samples.length-2) completeStroke();
   }
@@ -585,17 +618,20 @@ pad.addEventListener("pointerleave", endPointer);
 function completeStroke(){
   tracing = false;
   progress = samples.length-1;
-  onArrive = lockStroke;   // 最後まで 描ききってから 確定する
-  reveal();
+  const last = samples[samples.length-1];
+  targetPt = { x:last.x, y:last.y };      // 書きおわりは 終点で ちゃんと止める
+  if(!drawPt) drawPt = { x:last.x, y:last.y };
+  onArrive = lockStroke;                  // 描ききってから 確定する
+  startRaf();
 }
 
 function lockStroke(){
   // かきおわった せんを こていする
   const done = document.createElementNS("http://www.w3.org/2000/svg","path");
-  done.setAttribute("d", cur.strokes[strokeIdx]);
+  done.setAttribute("d", pathOf(drawPts));   // お手本やなく じぶんの線をのこす
   done.setAttribute("class","done-s");
   donesG.appendChild(done);
-  liveEl.style.strokeDashoffset = totalLen;
+  liveEl.setAttribute("d", "");
 
   if(strokeIdx < cur.strokes.length-1){
     setStroke(strokeIdx+1);
