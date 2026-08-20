@@ -369,6 +369,8 @@ let cur = null;        // いまの もじ
 let strokeIdx = 0;
 let progress  = 0;
 let tracing   = false;
+let lastPt    = null;  // まえの指の位置
+let traveled  = 0;     // 指が動いた合計きょり。線がこれを追いこさんようにする
 let samples   = [];    // いまの画の点れつ
 let totalLen  = 0;
 let allSamples= [];    // 全画ぶんの点れつ
@@ -429,6 +431,8 @@ function setStroke(i){
   strokeIdx = i;
   progress = 0;
   tracing = false;
+  lastPt = null;
+  traveled = 0;
   const s = allSamples[i];
   samples = s.pts;
   totalLen = s.len;
@@ -487,9 +491,9 @@ pad.addEventListener("pointerdown", e=>{
 
   // はじめから、または とちゅうから つづける
   if(dist(p, samples[0]) <= TOL_START){
-    tracing = true; progress = 0; reveal();
+    tracing = true; progress = 0; traveled = 0; reveal();
   }else if(progress>0 && dist(p, samples[progress]) <= TOL_START){
-    tracing = true;
+    tracing = true; traveled = progress * STEP;   // とちゅう再開ぶんは差し引く
   }else{
     // ちがう画の はじまりを さわった？
     let wrong = false;
@@ -500,6 +504,7 @@ pad.addEventListener("pointerdown", e=>{
     setHint(wrong ? "つぎは ここから！" : "まるい ところから はじめてね", wrong);
     return;
   }
+  lastPt = p;
   pad.setPointerCapture(e.pointerId);
   e.preventDefault();
 });
@@ -507,8 +512,15 @@ pad.addEventListener("pointerdown", e=>{
 pad.addEventListener("pointermove", e=>{
   if(!tracing) return;
   const p = toSvg(e);
+
+  /* 線が 指を おいこさんようにする。
+     指が動いた「合計きょり」で 頭うちにするのがミソ。
+     1回ごとの制限やと 切りあげの誤差が たまって だんだん先走る。 */
+  traveled += lastPt ? dist(p, lastPt) : 0;
+  const reach = Math.floor(traveled * 1.05 / STEP);   // 5%だけよゆう
+
   let best = progress;
-  const end = Math.min(progress + LOOKAHEAD, samples.length-1);
+  const end = Math.min(progress + LOOKAHEAD, reach, samples.length-1);
   for(let i=progress+1; i<=end; i++){
     if(dist(p, samples[i]) <= TOL) best = i;
   }
@@ -519,6 +531,7 @@ pad.addEventListener("pointermove", e=>{
     if(hintEl.classList.contains("warn")) setHint("そのまま すすんでね", false);
     if(progress >= samples.length-2) completeStroke();
   }
+  lastPt = p;
   e.preventDefault();
 }, {passive:false});
 
